@@ -11,12 +11,15 @@
     "db:migrate": "npx drizzle-kit migrate"
   },
   "dependencies": {
+    "bcrypt": "^6.0.0",
+    "bcryptjs": "^3.0.2",
     "better-auth": "^1.2.12",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "dotenv": "^17.2.0",
     "drizzle-orm": "^0.44.2",
     "lucide-react": "^0.525.0",
+    "mailer": "^0.6.7",
     "next": "15.3.5",
     "pg": "^8.16.3",
     "react": "^19.0.0",
