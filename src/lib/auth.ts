@@ -5,11 +5,16 @@ import { db } from "./db/index";
 import { admin } from "better-auth/plugins";
 import { nextCookies } from "better-auth/next-js";
 import { hash as bcryptHash, compare as bcryptCompare } from "bcryptjs";
+import { sendPasswordResetEmail } from "./mailer";
 // import { sendPasswordResetEmail } from "./lib/mailer";
 
 // setting the roles
 const adminRole = "admin";
 const userRole = "user";
+
+import { Resend } from "resend";
+
+const resend = new Resend(process.env.RESEND_API_KEY);
 
 export const auth = betterAuth({
   database: drizzleAdapter(db, {
@@ -20,14 +25,14 @@ export const auth = betterAuth({
     enabled: true,
     disableSignUp: false,
     requireEmailVerification: true,
-    minPasswordLength: 8,
+    minPasswordLength: 4,
     maxPasswordLength: 128,
     autoSignIn: true,
     resetPasswordTokenExpiresIn: 3600, // 1 hour
 
     sendResetPassword: async ({ user, url, token }) => {
       console.log(`Reset email for ${user.email}: ${url}`);
-      // await sendPasswordResetEmail(user.email, url);
+      await sendPasswordResetEmail(user.email, url);
     },
 
     password: {
@@ -45,6 +50,19 @@ export const auth = betterAuth({
         const isValid = await bcryptCompare(password, hash);
         return isValid;
       },
+    },
+  },
+  emailVerification: {
+    sendOnSignUp: true, // send verification email automatically on signup
+    autoSignInAfterVerification: true, // sign in user after they verify
+
+    sendVerificationEmail: async ({ user, url }) => {
+      await resend.emails.send({
+        from: "Acme <onboarding@resend.dev>", // verified sender
+        to: user.email,
+        subject: "Email Verification",
+        html: `Click the link to verify your email: <a href="${url}">${url}</a>`,
+      });
     },
   },
 
