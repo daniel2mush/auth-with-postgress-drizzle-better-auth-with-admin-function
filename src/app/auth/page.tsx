@@ -2,9 +2,62 @@
 import { signIn, signUp } from "@/lib/auth-client";
 import { useRouter } from "next/navigation";
 import React, { useState } from "react";
-import { FaBeer, FaGoogle } from "react-icons/fa";
-
+import { useForm } from "react-hook-form";
+import { FaBeer, FaEye, FaEyeSlash, FaGoogle } from "react-icons/fa";
+import { email, z } from "zod";
+import { zodResolver } from "@hookform/resolvers/zod";
+import {
+  Form,
+  FormControl,
+  FormField,
+  FormItem,
+  FormLabel,
+  FormMessage,
+} from "@/components/ui/form";
+import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
+import { toast } from "sonner";
+import { FadeLoader } from "react-spinners";
 export default function Home() {
+  const [isRegister, setIsRegister] = useState(false);
+  const [isLoading, setIsLoading] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
+
+  // zod schema
+  const authRegisterForm = z
+    .object({
+      username: z
+        .string()
+        .min(4, "Username should be more than 4 letters")
+        .optional(),
+      email: z.email(),
+      password: z.string().min(4, "Password should be more than 4 characters"),
+      confirmPassword: z.string(),
+    })
+    .refine((data) => data.password === data.confirmPassword, {
+      message: "Password does not match, please try again",
+      path: ["confirmPassword"],
+    });
+
+  const authLoginForm = z.object({
+    email: z.email(),
+    password: z.string(),
+  });
+
+  type authFormTypes =
+    | z.infer<typeof authLoginForm>
+    | z.infer<typeof authRegisterForm>;
+
+  const form = useForm<authFormTypes>({
+    resolver: zodResolver(isRegister ? authRegisterForm : authLoginForm),
+    defaultValues: {
+      username: "",
+      email: "",
+      password: "",
+      confirmPassword: "",
+    },
+  });
+
   const router = useRouter();
   async function handleLoginWithGoogle() {
     await signIn.social({
@@ -13,29 +66,39 @@ export default function Home() {
     });
   }
 
-  async function handleRegistration(event: React.FormEvent) {
-    event.preventDefault();
+  async function handleRegistration(data: authFormTypes) {
+    setIsLoading(true);
+    console.log("I was called Register");
+    const { email, password, username } = data as z.infer<
+      typeof authRegisterForm
+    >;
     try {
       const { data, error } = await signUp.email({
         email,
         password,
-        name: username,
+        name: username!,
       });
       if (error) {
         console.log(error.message);
+        toast.error(error.message);
         return;
       }
-      router.push("/");
+      setIsRegister(false);
+      toast.success(
+        "Registration successful. An email has been sent, confirm your email to continue"
+      );
 
       console.log(data.user);
     } catch (error) {
       console.log(error, "Console error");
     } finally {
-      (setEmail(""), setPassword(""));
+      setIsLoading(false);
     }
   }
-  async function handleLogin(event: React.FormEvent) {
-    event.preventDefault();
+  async function handleLogin(data: authFormTypes) {
+    setIsLoading(true);
+    const email = data.email;
+    const password = data.password;
     try {
       const { data, error } = await signIn.email({
         email,
@@ -43,22 +106,26 @@ export default function Home() {
       });
       if (error) {
         console.log(error.message);
+        toast.error(error.message);
         return;
       }
 
       router.push("/");
+      toast.success("login successfully");
 
       console.log(data.user);
     } catch (error) {
       console.log(error, "Console error");
     } finally {
-      (setEmail(""), setPassword(""));
+      setIsLoading(false);
     }
   }
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [username, setUsername] = useState("");
-  const [isRegister, setIsRegister] = useState(false);
+
+  function handleSwitch() {
+    setIsRegister(!isRegister);
+    form.reset();
+  }
+
   return (
     <div className=" min-h-screen flex justify-center items-center ">
       <div className=" container w-full max-w-lg shadow-xl  rounded p-4">
@@ -71,12 +138,13 @@ export default function Home() {
           </div>
 
           <div>
-            <div
+            <Button
+              variant={"outline"}
               onClick={handleLoginWithGoogle}
-              className=" rounded py-2 px-4 border font-bold cursor-pointer text-center flex items-center justify-center gap-2 hover:bg-black hover:text-white ">
+              className="w-full cursor-pointer ">
               <FaGoogle />
               Login with gmail
-            </div>
+            </Button>
           </div>
         </div>
         <div className=" flex justify-center items-center gap-3 mt-10 mb-5">
@@ -85,63 +153,131 @@ export default function Home() {
           <div className=" border-t-2 h-0.5 w-full" />
         </div>
         <div>
-          <form onSubmit={isRegister ? handleRegistration : handleLogin}>
-            {isRegister && (
-              <div className="  w-full px-2 py-2 space-y-4">
-                <label htmlFor="username" className=" font-bold ">
-                  Username
-                </label>
-                <input
-                  type="text"
-                  placeholder="Enter your username"
-                  id="username"
-                  className="px-2 py-1.5 rounded outline-0 border w-full"
-                  value={username}
-                  onChange={(e) => setUsername(e.target.value)}
+          <Form {...form}>
+            <form
+              onSubmit={form.handleSubmit(
+                isRegister ? handleRegistration : handleLogin
+              )}
+              className=" space-y-5">
+              {isRegister && (
+                <FormField
+                  name="username"
+                  control={form.control}
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>username</FormLabel>
+                      <FormControl>
+                        <Input
+                          placeholder="Enter your username"
+                          autoComplete="username"
+                          {...field}
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
                 />
-              </div>
-            )}
-            <div className="  w-full px-2 py-2 space-y-4">
-              <label htmlFor="email" className=" font-bold ">
-                Email
-              </label>
-              <input
-                type="email"
-                placeholder="Enter your email"
-                id="email"
-                className="px-2 py-1.5 rounded outline-0 border w-full"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
+              )}
+              <FormField
+                name="email"
+                control={form.control}
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Email</FormLabel>
+                    <FormControl>
+                      <Input
+                        placeholder="Enter your email"
+                        autoComplete="email"
+                        {...field}
+                      />
+                    </FormControl>
+
+                    <FormMessage />
+                  </FormItem>
+                )}
               />
-            </div>
-            <div className="  w-full px-2 py-2 space-y-4">
-              <label htmlFor="password" className=" font-bold  ">
-                Password
-              </label>
-              <input
-                type="password"
-                placeholder="Enter your password"
-                id="password"
-                className="px-2 py-1.5 rounded outline-0 border w-full"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
+              <FormField
+                name="password"
+                control={form.control}
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Password</FormLabel>
+                    <FormControl>
+                      <div className=" relative">
+                        <Input
+                          type={showPassword ? "text" : "password"}
+                          placeholder="Enter your password"
+                          {...field}
+                        />
+                        <Button
+                          onClick={() => setShowPassword((prev) => !prev)}
+                          type="button"
+                          variant={"ghost"}
+                          size={"icon"}
+                          className="absolute right-2 top-1/2 -translate-y-1/2 p-1 h-auto w-auto text-gray-500 cursor-pointer">
+                          {showPassword ? <FaEye /> : <FaEyeSlash />}
+                        </Button>
+                      </div>
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
               />
-            </div>
-            <button
-              type="submit"
-              className=" px-4 py-2 rounded bg-black w-full text-white hover:bg-black/65 cursor-pointer mt-10">
-              {isRegister ? "Register" : "Login"}
-            </button>
-          </form>
+              {isRegister && (
+                <FormField
+                  name="confirmPassword"
+                  control={form.control}
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Confirm Password</FormLabel>
+                      <FormControl>
+                        <div className=" relative">
+                          <Input
+                            type={showPassword ? "text" : "password"}
+                            placeholder="Enter your password again"
+                            {...field}
+                          />
+                          <Button
+                            onClick={() => setShowPassword((prev) => !prev)}
+                            type="button"
+                            variant={"ghost"}
+                            size={"icon"}
+                            className="absolute right-2 top-1/2 -translate-y-1/2 p-1 h-auto w-auto text-gray-500 cursor-pointer">
+                            {showPassword ? <FaEye /> : <FaEyeSlash />}
+                          </Button>
+                        </div>
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              )}
+              <Button
+                disabled={isLoading}
+                type="submit"
+                className=" w-full cursor-pointer">
+                {isLoading ? (
+                  <div className=" scale-50">
+                    <FadeLoader color="#4F46E5" />
+                  </div>
+                ) : isRegister ? (
+                  "Register"
+                ) : (
+                  "Login"
+                )}
+                {}
+              </Button>
+            </form>
+          </Form>
         </div>
         <div>
-          <p className=" text-sm text-center mt-5">
+          <p className=" text-sm text-center mt-3 ">
             Dont have an account{" "}
-            <button
-              onClick={() => setIsRegister(!isRegister)}
+            <span
+              onClick={handleSwitch}
               className=" hover:text-blue-600 underline cursor-pointer">
               {isRegister ? "login" : "register now!"}
-            </button>
+            </span>
           </p>
         </div>
       </div>
